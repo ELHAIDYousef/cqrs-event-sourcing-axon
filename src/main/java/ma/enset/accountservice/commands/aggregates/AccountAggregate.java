@@ -4,11 +4,13 @@ import lombok.extern.slf4j.Slf4j;
 import ma.enset.accountservice.commands.commands.AddAccountCommand;
 import ma.enset.accountservice.commands.commands.CreditAccountCommand;
 import ma.enset.accountservice.commands.commands.DebitAccountCommand;
+import ma.enset.accountservice.commands.commands.UpdateAccountStatusCommand;
 import ma.enset.accountservice.enums.AccountStatus;
 import ma.enset.accountservice.events.AccountActivatedEvent;
 import ma.enset.accountservice.events.AccountCreatedEvent;
 import ma.enset.accountservice.events.AccountCreditedEvent;
 import ma.enset.accountservice.events.AccountDebitedEvent;
+import ma.enset.accountservice.events.AccountStatusUpdatedEvent;
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
 import org.axonframework.modelling.command.AggregateIdentifier;
@@ -70,6 +72,15 @@ public class AccountAggregate {
         AggregateLifecycle.apply(new AccountDebitedEvent(command.id(), command.amount(), command.currency()));
     }
 
+    @CommandHandler
+    public void handle(UpdateAccountStatusCommand command) {
+        log.info("UpdateAccountStatusCommand received for account {}", command.id());
+        if (status == command.status()) {
+            throw new IllegalStateException("Account is already " + status);
+        }
+        AggregateLifecycle.apply(new AccountStatusUpdatedEvent(command.id(), command.status()));
+    }
+
     @EventSourcingHandler
     public void on(AccountCreatedEvent event) {
         this.accountId = event.accountId();
@@ -91,5 +102,10 @@ public class AccountAggregate {
     @EventSourcingHandler
     public void on(AccountDebitedEvent event) {
         this.balance -= event.amount();
+    }
+
+    @EventSourcingHandler
+    public void on(AccountStatusUpdatedEvent event) {
+        this.status = event.status();
     }
 }
