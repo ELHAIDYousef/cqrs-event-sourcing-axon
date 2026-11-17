@@ -4,15 +4,20 @@ import ma.enset.accountservice.commands.commands.AddAccountCommand;
 import ma.enset.accountservice.commands.commands.CreditAccountCommand;
 import ma.enset.accountservice.commands.commands.DebitAccountCommand;
 import ma.enset.accountservice.commands.commands.UpdateAccountStatusCommand;
+import ma.enset.accountservice.commands.dto.AccountEventResponseDTO;
 import ma.enset.accountservice.commands.dto.AddAccountRequestDTO;
 import ma.enset.accountservice.commands.dto.CreditAccountRequestDTO;
 import ma.enset.accountservice.commands.dto.DebitAccountRequestDTO;
 import ma.enset.accountservice.commands.dto.UpdateAccountStatusRequestDTO;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.axonframework.commandhandling.gateway.CommandGateway;
+import org.axonframework.eventsourcing.eventstore.EventStore;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,9 +33,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AccountCommandController {
 
     private final CommandGateway commandGateway;
+    private final EventStore eventStore;
 
-    public AccountCommandController(CommandGateway commandGateway) {
+    public AccountCommandController(CommandGateway commandGateway, EventStore eventStore) {
         this.commandGateway = commandGateway;
+        this.eventStore = eventStore;
     }
 
     @PostMapping("/add")
@@ -62,6 +69,17 @@ public class AccountCommandController {
         return commandGateway.send(new UpdateAccountStatusCommand(
                 request.accountId(),
                 request.status()));
+    }
+
+    @GetMapping("/events/{accountId}")
+    public List<AccountEventResponseDTO> events(@PathVariable String accountId) {
+        return eventStore.readEvents(accountId).asStream()
+                .map(event -> new AccountEventResponseDTO(
+                        event.getPayloadType().getSimpleName(),
+                        event.getSequenceNumber(),
+                        event.getTimestamp(),
+                        event.getPayload()))
+                .toList();
     }
 
     @ExceptionHandler(Exception.class)
