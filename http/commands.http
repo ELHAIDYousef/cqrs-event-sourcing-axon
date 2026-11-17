@@ -1,0 +1,54 @@
+@host = http://localhost:8083
+
+### Creer un compte (5000 MAD)
+POST {{host}}/commands/accounts/add
+Content-Type: application/json
+
+{"initialBalance":5000,"currency":"MAD"}
+
+> {% client.global.set("accountId", response.body); %}
+
+### Creer un compte avec solde negatif (doit echouer)
+POST {{host}}/commands/accounts/add
+Content-Type: application/json
+
+{"initialBalance":-100,"currency":"MAD"}
+
+### Credit 2000
+POST {{host}}/commands/accounts/credit
+Content-Type: application/json
+
+{"accountId":"{{accountId}}","amount":2000,"currency":"MAD"}
+
+### Credit negatif -5 (doit echouer)
+POST {{host}}/commands/accounts/credit
+Content-Type: application/json
+
+{"accountId":"{{accountId}}","amount":-5,"currency":"MAD"}
+
+### Debit 1000
+POST {{host}}/commands/accounts/debit
+Content-Type: application/json
+
+{"accountId":"{{accountId}}","amount":1000,"currency":"MAD"}
+
+### Debit 999999 (solde insuffisant, doit echouer)
+POST {{host}}/commands/accounts/debit
+Content-Type: application/json
+
+{"accountId":"{{accountId}}","amount":999999,"currency":"MAD"}
+
+### Statut SUSPENDED
+PUT {{host}}/commands/accounts/updateStatus
+Content-Type: application/json
+
+{"accountId":"{{accountId}}","status":"SUSPENDED"}
+
+### Statut ACTIVATED
+PUT {{host}}/commands/accounts/updateStatus
+Content-Type: application/json
+
+{"accountId":"{{accountId}}","status":"ACTIVATED"}
+
+### Evenements du compte
+GET {{host}}/commands/accounts/events/{{accountId}}
