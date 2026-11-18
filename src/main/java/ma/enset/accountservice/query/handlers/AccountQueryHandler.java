@@ -8,6 +8,7 @@ import ma.enset.accountservice.query.entities.Account;
 import ma.enset.accountservice.query.entities.AccountOperation;
 import ma.enset.accountservice.query.queries.GetAccountStatementQuery;
 import ma.enset.accountservice.query.queries.GetAllAccountsQuery;
+import ma.enset.accountservice.query.queries.WatchEventQuery;
 import ma.enset.accountservice.query.repositories.AccountOperationRepository;
 import ma.enset.accountservice.query.repositories.AccountRepository;
 import org.axonframework.queryhandling.QueryHandler;
@@ -45,6 +46,15 @@ public class AccountQueryHandler {
                 .map(this::toDto)
                 .toList();
         return new AccountStatementResponseDTO(toDto(account), operations);
+    }
+
+    @QueryHandler
+    public AccountOperationResponseDTO on(WatchEventQuery query) {
+        List<AccountOperation> operations = accountOperationRepository.findByAccountIdOrderByDateAsc(query.accountId());
+        if (operations.isEmpty()) {
+            return null;
+        }
+        return toDto(operations.get(operations.size() - 1));
     }
 
     private AccountResponseDTO toDto(Account account) {

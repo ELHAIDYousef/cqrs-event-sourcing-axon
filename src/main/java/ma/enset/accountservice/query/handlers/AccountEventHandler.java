@@ -7,11 +7,14 @@ import ma.enset.accountservice.events.AccountCreditedEvent;
 import ma.enset.accountservice.events.AccountDebitedEvent;
 import ma.enset.accountservice.events.AccountStatusUpdatedEvent;
 import ma.enset.accountservice.query.entities.Account;
+import ma.enset.accountservice.query.dto.AccountOperationResponseDTO;
 import ma.enset.accountservice.query.entities.AccountOperation;
+import ma.enset.accountservice.query.queries.WatchEventQuery;
 import ma.enset.accountservice.query.repositories.AccountOperationRepository;
 import ma.enset.accountservice.query.repositories.AccountRepository;
 import org.axonframework.eventhandling.EventHandler;
 import org.axonframework.eventhandling.EventMessage;
+import org.axonframework.queryhandling.QueryUpdateEmitter;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,11 +27,14 @@ public class AccountEventHandler {
 
     private final AccountRepository accountRepository;
     private final AccountOperationRepository accountOperationRepository;
+    private final QueryUpdateEmitter queryUpdateEmitter;
 
     public AccountEventHandler(AccountRepository accountRepository,
-                               AccountOperationRepository accountOperationRepository) {
+                               AccountOperationRepository accountOperationRepository,
+                               QueryUpdateEmitter queryUpdateEmitter) {
         this.accountRepository = accountRepository;
         this.accountOperationRepository = accountOperationRepository;
+        this.queryUpdateEmitter = queryUpdateEmitter;
     }
 
     @EventHandler
@@ -64,7 +70,8 @@ public class AccountEventHandler {
     @Transactional
     public void on(AccountCreditedEvent event, EventMessage<AccountCreditedEvent> message) {
         Account account = findAccount(event.accountId());
-        saveOperation(account, OperationType.CREDIT, event.amount(), event.currency(), message);
+        AccountOperation operation = saveOperation(account, OperationType.CREDIT, event.amount(), event.currency(), message);
+        emitOperation(event.accountId(), operation);
         account.setBalance(account.getBalance() + event.amount());
         accountRepository.save(account);
     }
@@ -73,7 +80,8 @@ public class AccountEventHandler {
     @Transactional
     public void on(AccountDebitedEvent event, EventMessage<AccountDebitedEvent> message) {
         Account account = findAccount(event.accountId());
-        saveOperation(account, OperationType.DEBIT, event.amount(), event.currency(), message);
+        AccountOperation operation = saveOperation(account, OperationType.DEBIT, event.amount(), event.currency(), message);
+        emitOperation(event.accountId(), operation);
         account.setBalance(account.getBalance() - event.amount());
         accountRepository.save(account);
     }
@@ -83,7 +91,7 @@ public class AccountEventHandler {
                 .orElseThrow(() -> new IllegalStateException("Account not found in read model: " + accountId));
     }
 
-    private void saveOperation(Account account, OperationType type, double amount, String currency,
+    private AccountOperation saveOperation(Account account, OperationType type, double amount, String currency,
                                EventMessage<?> message) {
         AccountOperation operation = AccountOperation.builder()
                 .date(message.getTimestamp())
@@ -92,6 +100,12 @@ public class AccountEventHandler {
                 .currency(currency)
                 .account(account)
                 .build();
-        accountOperationRepository.save(operation);
+        return accountOperationRepository.save(operation);
+    }
+
+    private void emitOperation(String accountId, AccountOperation operation) {
+        AccountOperationResponseDTO operationDto = new AccountOperationResponseDTO(operation.getId(),
+                operation.getDate(), operation.getAmount(), operation.getType(), operation.getCurrency(), accountId);
+        queryUpdateEmitter.emit(WatchEventQuery.class, query -> query.accountId().equals(accountId), operationDto);
     }
 }
