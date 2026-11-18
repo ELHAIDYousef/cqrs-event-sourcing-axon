@@ -1,0 +1,8 @@
+@host = http://localhost:8083
+
+### Lister tous les comptes
+GET {{host}}/query/accounts/all
+
+### Releve du compte (operations)
+# Prerequis : creer d'abord un compte avec commands.http (la variable accountId y est posee).
+GET {{host}}/query/accounts/accountStatement/{{accountId}}
